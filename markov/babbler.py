@@ -1,3 +1,5 @@
+# Aran Ogaki, CS317, SP25
+
 import random
 import glob
 import sys
@@ -70,7 +72,6 @@ class Babbler:
         # state used as keys are strings with spaces between words; values are lists of words that could follow the keys.
         # value list can have repeated entries to preserve probability
 
-
         self.brainGraph = {}  # note that we need to be able to quickly find options for current state (so we use it for indexing, i.e. as our key)
 
         self.starters = [] # let's track starting states as a list of strings (could have made them part of dictionary but let's have a list for debugging/testing purposes )
@@ -112,6 +113,37 @@ class Babbler:
         special symbol 'EOL' in the state transition table. 'EOL' is short for 'end of line'; since it is capitalized and all our input texts are lower-case, it will be unambiguous.
         """
 
+        words = sentence.split()
+
+        # Exception handling: if the sentence is less than n words long, we can't process it
+        if len(words) < self.n:
+            print("Error: sentence is too short to process")
+            return
+        
+        starter_ngram = " ".join(words[:self.n]) # get the first n words as the starter n-gram
+        if starter_ngram not in self.starters: # check if the starter n-gram is already in the list of starters
+            self.starters.append(starter_ngram) # if not, add it to the list of starters
+
+        # Add the last n words as the stopper n-gram
+        stopper_ngram = " ".join(words[-self.n:]) # get the last n words as the stopper n-gram
+
+        # Process each n-gram in the sentence and update the brainGraph with the successor word
+        for i in range(len(words) - self.n):
+            # Get the current n-gram (n words starting from index i)
+            current_ngram = " ".join(words[i:i+self.n])
+            # Get the next word that follows the current n-gram
+            next_word = words[i+self.n]
+            if current_ngram not in self.brainGraph:
+                self.brainGraph[current_ngram] = []
+            self.brainGraph[current_ngram].append(next_word)
+        
+        # Add the final n-gram to the brainGraph with 'EOL' as the successor
+        final_ngram = " ".join(words[-self.n:])
+        if final_ngram not in self.brainGraph:
+            self.brainGraph[final_ngram] = []
+        self.brainGraph[final_ngram].append('EOL') # add 'EOL' as the successor for the final n-gram
+        self.stoppers.append(final_ngram) # add the final n-gram to the list of stoppers
+
         pass #The pass statement is used as a placeholder for future code. When the pass statement is executed, nothing happens, but you avoid getting an error when empty code is not allowed. Empty code is not allowed in loops, function definitions, class definitions, or in if statements.
 
 
@@ -121,8 +153,11 @@ class Babbler:
         The resulting list may contain duplicates, because one n-gram may start
         multiple sentences. Probably a one-line method.
         """
-        pass
+
+        return self.starters # return the list of starters; this is already a list, so we don't need to do anything else with it
+        
     
+
 
     def get_stoppers(self):
         """
@@ -130,6 +165,7 @@ class Babbler:
         The resulting value may contain duplicates, because one n-gram may stop
         multiple sentences. Probably a one-line method.
         """
+        return self.stoppers # return the list of stoppers; this is already a list, so we don't need to do anything else with it
         pass
 
 
@@ -142,19 +178,23 @@ class Babbler:
             'the dog dances quickly'
             'the dog dances with the cat'
             'the dog dances with me'
-        If n=3, then the n-gram 'the dog dances' is followed by 'quickly' one time, and 'with' two times.
+        If n=3, then the n-gram 'the dog dances' is followed by 'quickly' one time, and 'with' 2/3 of the time.
         If the given state never occurs, return an empty list.
         """
-
+        if ngram in self.brainGraph:
+            return self.brainGraph[ngram]
+        else:
+            return []
         pass
     
+
 
     def get_all_ngrams(self):
         """
         Return all the possible n-grams (sequences of n words), that we have seen across all sentences.
         Probably a one-line method.
         """
-
+        return list(self.brainGraph.keys()) # return the keys of the brainGraph dictionary as a list
         pass
 
     
@@ -165,10 +205,11 @@ class Babbler:
         because ngrams with no successor words must not have occurred in the training sentences.
         Probably a one-line method.
         """
-
+        # Check if the ngram is in the brainGraph and has successors
+        return ngram in self.brainGraph and len(self.brainGraph[ngram]) > 0 # return True if the ngram is in the brainGraph and has successors, otherwise return False
         pass
     
-    
+
     def get_random_successor(self, ngram):
         """
         Given an n-gram, randomly pick from the possible words that could follow that n-gram. 
@@ -180,9 +221,14 @@ class Babbler:
         and we call get_random_next_word() for the state 'the dog dances',
         we should get 'quickly' about 1/3 of the time, and 'with' 2/3 of the time.
         """
+        # Get the list of successors for the given n-gram from the brainGraph
+        successors = self.get_successors(ngram) # get the successors for the given n-gram from the brainGraph
 
+        if successors:  
+            return random.choice(successors) # randomly choose one of the successors from the list
+        else:
+            return None # if there are no successors, return None
         pass
-    
 
     def babble(self):
         """
@@ -198,7 +244,24 @@ class Babbler:
             Our example state is now: 'b c d' 
         6: Repeat from step 2.
         """
+        # First step: Pick a random starter ngram from the list of starters
+        current_ngram = random.choice(self.starters) # randomly choose a starter ngram from the list of starters
+        # Start the sentence with the current ngram
+        sentence_words = current_ngram.split() # initialize the sentence with the current ngram
 
+        # Convert the current ngram to a list of words for easier manipulation
+        while True:  # 修正: 'While' -> 'while'
+            # Get the next word based on the current ngram
+            next_word = self.get_random_successor(current_ngram)  # 追加: 次の単語を取得
+            if next_word == 'EOL' or next_word is None:
+                break # if the next word is 'EOL' or None, break out of the loop
+            # Otherwise, add the next word to the sentence
+            sentence_words.append(next_word) # add the next word to the sentence
+            # Update the current ngram by removing the first word and adding the next word
+            current_ngram_words = current_ngram.split()[1:] + [next_word] # update the current ngram by removing the first word and adding the next word
+            current_ngram = " ".join(current_ngram_words) # join the words back into a string for the current ngram
+        # Join all words into a single string and return the sentence
+        return " ".join(sentence_words) # join the words in the sentence into a single string and return it
         pass
             
 
